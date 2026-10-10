@@ -173,17 +173,17 @@
                 if (!u.startsWith('http')) {
                     u = 'https://script.google.com/macros/s/' + u.replace(/^\/+|\/+$/g, '').replace(/\/exec$/i, '') + '/exec';
                 }
-                if (u.startsWith('https://script.google.com/')) return u;
+                if (u.startsWith('http')) return u;
             }
             if (window.ARJUGO_CONFIG && window.ARJUGO_CONFIG.GAS_URL) {
                 let confU = window.ARJUGO_CONFIG.GAS_URL.trim();
                 if (confU) {
                     if (!confU.startsWith('http')) confU = 'https://script.google.com/macros/s/' + confU.replace(/^\/+|\/+$/g, '').replace(/\/exec$/i, '') + '/exec';
-                    if (confU.startsWith('https://script.google.com/')) return confU;
+                    if (confU.startsWith('http')) return confU;
                 }
             }
             const mainGas = (typeof getGoogleAppsScriptUrl === 'function') ? getGoogleAppsScriptUrl() : '';
-            if (mainGas && mainGas.startsWith('https://script.google.com/')) return mainGas.trim();
+            if (mainGas && mainGas.startsWith('http')) return mainGas.trim();
         } catch(e) {}
         return '';
     }
