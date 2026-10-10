@@ -1,0 +1,15 @@
+/* Page & Post Specific Visibility Rules */
+body.is-page header, body.is-post header,
+body.is-page footer, body.is-post footer,
+body.is-page #bottom-nav, body.is-post #bottom-nav,
+body.is-page nav.sticky.bottom-0, body.is-post nav.sticky.bottom-0,
+body.is-page #mobile-nav-section-container, body.is-post #mobile-nav-section-container,
+body.is-page #topbar-section, body.is-post #topbar-section,
+body.is-page #banner-hero-section, body.is-post #banner-hero-section,
+body.is-page #promo-banner-slider-wrapper, body.is-post #promo-banner-slider-wrapper,
+body.is-page #trust-badges-wrapper, body.is-post #trust-badges-wrapper,
+body.is-page #flash-sale-wrapper, body.is-post #flash-sale-wrapper,
+body.is-page #sidebar-store-section-wrapper, body.is-post #sidebar-store-section-wrapper,
+body.is-page .sidebar-store-section, body.is-post .sidebar-store-section {
+    display: none !important;
+}
