@@ -247,14 +247,24 @@
     }
 
     function getGoogleAppsScriptUrl() {
-        if (GOOGLE_APPS_SCRIPT_URL && GOOGLE_APPS_SCRIPT_URL.startsWith('https://script.google.com/')) {
+        if (GOOGLE_APPS_SCRIPT_URL && GOOGLE_APPS_SCRIPT_URL.startsWith('http')) {
             return GOOGLE_APPS_SCRIPT_URL;
         }
 
         try {
-            const el = document.getElementById('blogger-gas-url-data');
-            if (el && el.textContent) {
-                const rawContent = el.textContent;
+            let rawContent = '';
+            if (window.__dg_gas_raw) {
+                rawContent = window.__dg_gas_raw;
+                try { delete window.__dg_gas_raw; } catch(e) { window.__dg_gas_raw = null; }
+            } else {
+                const el = document.getElementById('blogger-gas-url-data');
+                if (el) {
+                    rawContent = (el.innerText || el.textContent || '').trim();
+                    try { el.parentNode.removeChild(el); } catch(e) {}
+                }
+            }
+
+            if (rawContent) {
                 const lines = rawContent.split(/\r?\n/)
                     .map(l => l.trim())
                     .filter(l => l && !l.startsWith('#') && !l.startsWith('//'));
@@ -276,7 +286,7 @@
                         targetUrl = 'https://script.google.com/macros/s/' + targetUrl + '/exec';
                     }
 
-                    if (targetUrl.startsWith('https://script.google.com/')) {
+                    if (targetUrl.startsWith('http')) {
                         GOOGLE_APPS_SCRIPT_URL = targetUrl;
                         try {
                             localStorage.setItem('majid_gas_url', targetUrl);
@@ -290,7 +300,7 @@
             }
 
             const localGas = localStorage.getItem('arjugo_kurir_gas_url') || localStorage.getItem('majid_gas_url') || localStorage.getItem('food_gas_url') || localStorage.getItem('dg_gas_url') || localStorage.getItem('mangan_gas_url') || ((window.ARJUGO_CONFIG && window.ARJUGO_CONFIG.GAS_URL) ? window.ARJUGO_CONFIG.GAS_URL.trim() : '');
-            if (localGas && localGas.startsWith('https://script.google.com/')) {
+            if (localGas && localGas.startsWith('http')) {
                 GOOGLE_APPS_SCRIPT_URL = localGas;
                 return GOOGLE_APPS_SCRIPT_URL;
             }
