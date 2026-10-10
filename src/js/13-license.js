@@ -1,9 +1,17 @@
-
-    const LICENSE_SECRET_KEY = "D12IG12IAR89JU_OK";
+    /**
+     * =========================================================================
+     * Security & License Verification Engine
+     * =========================================================================
+     */
+    var _secCodes = [68, 49, 50, 73, 71, 49, 50, 73, 65, 82, 56, 57, 74, 85, 95, 79, 75];
+    var _getSecKey = function() {
+        return String.fromCharCode.apply(null, _secCodes);
+    };
 
     function generateExpectedLicenseToken(id, secret) {
         if (!id) return "";
-        var str = String(id).trim() + String(secret).trim();
+        var key = secret || _getSecKey();
+        var str = String(id).trim() + String(key).trim();
         var hash = 0;
         for (var i = 0; i < str.length; i++) {
             var char = str.charCodeAt(i);
@@ -21,39 +29,7 @@
     }
 
     function getClientBloggerId() {
-        var metaId = document.querySelector('meta[name="blogger-blog-id"]');
-        if (metaId && metaId.content && metaId.content.trim() && metaId.content.indexOf('data:blog') === -1) {
-            return metaId.content.trim();
-        }
-
-        var helper = document.getElementById('blogger-meta-helper');
-        if (helper) {
-            var attrId = helper.getAttribute('data-blog-id');
-            if (attrId && attrId.trim() && attrId.indexOf('data:blog') === -1) {
-                return attrId.trim();
-            }
-            var textId = (helper.innerText || helper.textContent || '').trim();
-            if (textId && textId.indexOf('data:blog') === -1) {
-                return textId;
-            }
-        }
-
-        if (typeof currentBloggerId !== 'undefined' && currentBloggerId && String(currentBloggerId).indexOf('data:blog') === -1) {
-            return String(currentBloggerId).trim();
-        }
-
-        var rsd = document.querySelector('link[type="application/rsd+xml"]');
-        if (rsd && rsd.href) {
-            var matchRsd = rsd.href.match(/blogID=(\d+)/i);
-            if (matchRsd && matchRsd[1]) return matchRsd[1];
-        }
-
-        var feed = document.querySelector('link[rel="service.post"]');
-        if (feed && feed.href) {
-            var matchFeed = feed.href.match(/feeds\/(\d+)\/posts/i);
-            if (matchFeed && matchFeed[1]) return matchFeed[1];
-        }
-
+        // 1. Periksa dari internal WidgetManager Blogger bawaan
         try {
             if (window._WidgetManager && typeof window._WidgetManager._GetAllData === 'function') {
                 var wData = window._WidgetManager._GetAllData();
@@ -63,7 +39,21 @@
             }
         } catch(e) {}
 
-        return localStorage.getItem('dg_dev_test_blog_id') || '1234567890123456789';
+        // 2. Periksa dari tag RSD bawaan Blogger
+        var rsd = document.querySelector('link[type="application/rsd+xml"]');
+        if (rsd && rsd.href) {
+            var matchRsd = rsd.href.match(/blogID=(\d+)/i);
+            if (matchRsd && matchRsd[1]) return matchRsd[1];
+        }
+
+        // 3. Periksa dari feed post bawaan Blogger
+        var feed = document.querySelector('link[rel="service.post"]');
+        if (feed && feed.href) {
+            var matchFeed = feed.href.match(/feeds\/(\d+)\/posts/i);
+            if (matchFeed && matchFeed[1]) return matchFeed[1];
+        }
+
+        return localStorage.getItem('dg_dev_test_blog_id') || '';
     }
 
     function verifyLicenseToken(token) {
@@ -71,34 +61,51 @@
         var clean = extractLicenseToken(token);
         if (!clean) return false;
 
-        var blogId = getClientBloggerId();
-        var expectedBlogToken = generateExpectedLicenseToken(blogId, LICENSE_SECRET_KEY);
-        if (clean === expectedBlogToken) return true;
-
+        // A. Verifikasi via Hostname / Domain (Rekomendasi Utama)
         var host = (window.location.hostname || '').replace(/^www\./i, '').toLowerCase();
         if (host && host !== 'localhost' && host !== '127.0.0.1') {
-            var expectedHostToken = generateExpectedLicenseToken(host, LICENSE_SECRET_KEY);
+            var expectedHostToken = generateExpectedLicenseToken(host);
             if (clean === expectedHostToken) return true;
+        }
+
+        // B. Verifikasi via Blogger ID (Internal)
+        var blogId = getClientBloggerId();
+        if (blogId) {
+            var expectedBlogToken = generateExpectedLicenseToken(blogId);
+            if (clean === expectedBlogToken) return true;
         }
 
         return false;
     }
 
     function getTataLetakWidgetToken() {
-        var keyElement = document.getElementById('template-license-key');
-        if (keyElement) {
-            var raw = (keyElement.innerText || keyElement.textContent || '').trim();
-            var tok = extractLicenseToken(raw);
-            if (tok) return tok;
+        var tok = '';
+
+        // 1. Ambil dari memory token yang diselamatkan sebelum DOM dihapus
+        if (window.__dg_ltk) {
+            tok = extractLicenseToken(window.__dg_ltk);
+            try { delete window.__dg_ltk; } catch(e) { window.__dg_ltk = null; }
         }
 
-        var sec = document.getElementById('lisensi-section');
-        if (sec) {
-            var secTok = extractLicenseToken(sec.innerText || sec.textContent || '');
-            if (secTok) return secTok;
+        // 2. Jika masih ada elemen di DOM, ambil dan segera musnahkan (self-destruct)
+        if (!tok) {
+            var keyElement = document.getElementById('template-license-key');
+            if (keyElement) {
+                var raw = (keyElement.innerText || keyElement.textContent || '').trim();
+                tok = extractLicenseToken(raw);
+                try { keyElement.parentNode.removeChild(keyElement); } catch(e) {}
+            }
         }
 
-        return '';
+        // 3. Fallback jika ada di container widget
+        if (!tok) {
+            var sec = document.getElementById('lisensi-section');
+            if (sec) {
+                tok = extractLicenseToken(sec.innerText || sec.textContent || '');
+            }
+        }
+
+        return tok;
     }
 
     function checkTemplateLicense() {
@@ -122,23 +129,28 @@
             isActivated = true;
         }
 
-        if (!isActivated) {
-            window.__isTemplateLicensed = false;
+        // Kunci status lisensi dengan Object.defineProperty agar tidak bisa diubah via DevTools Console
+        try {
+            Object.defineProperty(window, '__isTemplateLicensed', {
+                value: isActivated,
+                writable: false,
+                configurable: false
+            });
+        } catch(e) {
+            window.__isTemplateLicensed = isActivated;
+        }
 
+        if (!isActivated) {
             if (popup) {
                 popup.style.display = 'flex';
                 document.documentElement.style.overflow = 'hidden';
                 document.body.style.overflow = 'hidden';
             }
-
             if (wrapper) {
                 wrapper.style.display = 'none';
             }
-
             return false;
         } else {
-            window.__isTemplateLicensed = true;
-
             if (popup) {
                 popup.style.display = 'none';
             }
@@ -153,4 +165,3 @@
 
     checkTemplateLicense();
     document.addEventListener('DOMContentLoaded', checkTemplateLicense);
-
